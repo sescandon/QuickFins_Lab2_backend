@@ -2,6 +2,7 @@ package co.edu.unal.software_engineering.labs.controller;
 
 import co.edu.unal.software_engineering.labs.model.Association;
 import co.edu.unal.software_engineering.labs.model.Course;
+import co.edu.unal.software_engineering.labs.model.Role;
 import co.edu.unal.software_engineering.labs.model.User;
 import co.edu.unal.software_engineering.labs.pojo.CoursePOJO;
 import co.edu.unal.software_engineering.labs.pojo.EnrolledCoursePOJO;
@@ -24,36 +25,43 @@ import java.util.List;
 public class CourseController{
 
     private final CourseService courseService;
-
     private final AssociationService associationService;
     private final UserService userService;
 
-    public CourseController( CourseService courseService, AssociationService associationService, UserService userService ){
+    public CourseController(CourseService courseService, AssociationService associationService, UserService userService) {
         this.courseService = courseService;
         this.associationService = associationService;
         this.userService = userService;
     }
 
-    @PostMapping( value = {"/profesor/crear-curso"} )
-    public ResponseEntity<Void> createCourse( @RequestBody CoursePOJO coursePojo ){
-        Course course = courseService.mapperCourseEntity( coursePojo );
-        if( !courseService.isRightCourse( course ) ){
-            return new ResponseEntity<>( HttpStatus.BAD_REQUEST );
+    @PostMapping(value = {"/profesor/crear-curso"})
+    public ResponseEntity<Void> createCourse(@RequestBody CoursePOJO coursePojo) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User professor = userService.findByUsername(username);
+        Course course = courseService.mapperCourseEntity(coursePojo);
+        Role role = new Role();  
+
+        if (professor == null || !courseService.isRightCourse(course)) {
+            return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
         }
-        courseService.save( course );
-        return new ResponseEntity<>( HttpStatus.CREATED );
+
+        role.setId(Role.ROLE_TEACHER); 
+        courseService.save(course);
+
+        associationService.associate(professor, role, course, null);
+
+        return new ResponseEntity<>(HttpStatus.CREATED);
     }
 
-    @GetMapping( "/mis-cursos" )
-    public List<EnrolledCoursePOJO> getCoursesByUser( ){
-        String username = SecurityContextHolder.getContext( ).getAuthentication( ).getName( );
-        User user = userService.findByUsername( username );
-        List<Association> associations = associationService.getAssociationsByUser( user );
-        List<EnrolledCoursePOJO> enrolledCourses = new ArrayList<>( );
-        for( Association association : associations ){
-            enrolledCourses.add( new EnrolledCoursePOJO( association ) );
+    @GetMapping("/mis-cursos")
+    public List<EnrolledCoursePOJO> getCoursesByUser() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userService.findByUsername(username);
+        List<Association> associations = associationService.getAssociationsByUser(user);
+        List<EnrolledCoursePOJO> enrolledCourses = new ArrayList<>();
+        for (Association association : associations) {
+            enrolledCourses.add(new EnrolledCoursePOJO(association));
         }
         return enrolledCourses;
     }
-
 }
